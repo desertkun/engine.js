@@ -1,13 +1,10 @@
 function Sprite() {
 	this.x = 0;
 	this.y = 0;
-
 	this.image = null;
 	this.engine = null;
-
 	this.width = 0;
 	this.height = 0;
-
 	this.animated = false;
 	this.frames = [];
 	this.frameWidth = 0;
@@ -15,6 +12,7 @@ function Sprite() {
 	this.frameTime = 24;
 	this.frameLastTime = 0;
 	this.currentFrame = 0;
+	this.playAnimation = false;
 
 	/**
 	 * Set image for this Sprite
@@ -32,7 +30,6 @@ function Sprite() {
 		this.frameWidth = frameWidth;
 		this.frameHeight = frameHeight;
 		this.frameTime = Math.floor(1000 / fps);
-		console.log(this.frameTime);
 		this.animated = true;
 
 		for (var framey = 0; framey < this.height / frameHeight; framey++) {
@@ -52,6 +49,19 @@ function Sprite() {
 
 	var lastTime = new Date().getTime();
 
+	this.pause = function() {
+		this.playAnimation = false;
+	};
+
+	this.stop = function() {
+		this.pause();
+		this.currentFrame = 0;
+	};
+
+	this.play = function() {
+		this.playAnimation = true;
+	};
+
 	/**
 	 * Render the Sprite
 	 */
@@ -66,12 +76,14 @@ function Sprite() {
 			if (this.animated) {
 				this.engine.context.drawImage(this.image, this.frames[this.currentFrame].framex * this.frameWidth, this.frames[this.currentFrame].framey * this.frameHeight, this.frameWidth, this.frameHeight, this.x, this.y, this.width, this.height);
 
-				this.frameLastTime += this.deltaTime;
-				if (this.frameLastTime >= this.frameTime) {
-					this.currentFrame++;
-					this.frameLastTime = 0;
-					if (this.currentFrame == this.frames.length) {
-						this.currentFrame = 0;
+				if(this.playAnimation) {
+					this.frameLastTime += this.deltaTime;
+					if (this.frameLastTime >= this.frameTime) {
+						this.currentFrame++;
+						this.frameLastTime = 0;
+						if (this.currentFrame == this.frames.length) {
+							this.currentFrame = 0;
+						}
 					}
 				}
 			} else {
@@ -82,17 +94,40 @@ function Sprite() {
 };
 
 function Engine(renderID, debug) {
+	var engine = this;
+
 	this.canvas = document.getElementById(renderID);
 	this.context = this.canvas.getContext('2d');
-
 	this.screenWidth = this.canvas.width;
 	this.screenHeight = this.canvas.height;
-
 	this.clearStyle = '#6495ED';
-
 	this.r = {};
-
 	this.debug = (typeof debug == "undefined") ? false : (debug === true);
+
+	/**
+	 * Keyboard input handle
+	 */
+	this.keyDown = new Array(256);
+	this.onKeyDown = function(keyboardEvent) {
+		engine.keyDown[keyboardEvent.keyCode] = true;
+	};
+	this.onKeyUp = function(keyboardEvent) {
+		engine.keyDown[keyboardEvent.keyCode] = false;
+	};
+	this.isLeft = function() {
+		return this.keyDown[37] || this.keyDown[65];
+	};
+	this.isRight = function() {
+		return this.keyDown[39] || this.keyDown[68];
+	};
+	this.isUp = function() {
+		return this.keyDown[38] || this.keyDown[87];
+	};
+	this.isDown = function() {
+		return this.keyDown[40] || this.keyDown[83];
+	};
+	window.addEventListener("keydown", this.onKeyDown);
+	window.addEventListener("keyup", this.onKeyUp);
 
 	/**
 	 * Write log message
@@ -122,11 +157,8 @@ function Engine(renderID, debug) {
 	 */
 	this.run = function() {
 		var render = function(engine) {
-
 			engine.clear();
-
 			engine.onrender();
-
 			setTimeout(function() {
 				render(engine);
 			}, 1000 / 60);
@@ -184,12 +216,9 @@ function Engine(renderID, debug) {
 		if (typeof baseDir === "undefined") {
 			baseDir = '.';
 		};
-
 		var resourcesLoaded = 0;
 		var resourcesToLoad = 0;
-
 		var resourceQueue = [];
-
 		this.context.fillStyle = '#000';
 		this.context.font = 'bold 40px Arial';
 		this.context.fillText('Loading', 10, this.canvas.height / 2);
