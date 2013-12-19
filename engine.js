@@ -1,386 +1,465 @@
-function Color(r, g, b, a) {
-	this.r = r;
-	this.g = g;
-	this.b = b;
-	this.a = a;
-
-	this.setRGBA = function(r, g, b, a) {
+/*!
+ *  Here will be some desctiption about this code
+ */
+function Engine(options) {
+	/**
+	 * Color utility object
+	 *
+	 */
+	function Color(r, g, b, a) {
 		this.r = r;
 		this.g = g;
 		this.b = b;
 		this.a = a;
-	}
 
-	this.getFullHex = function() {
-		return '#' + this.r.toString(16) + this.g.toString(16) + this.b.toString(16) + this.a.toString(16);
-	};
-
-	this.getRGBHex = function() {
-		return '#' + this.r.toString(16) + this.g.toString(16) + this.b.toString(16);
-	};
-};
-
-function Vector(dx, dy) {
-	this.set = function(dx, dy) {
-		this.dx = dx;
-		this.dy = dy;
-	};
-
-	this.length = function() {
-		return Math.sqrt(dx * dx + dy * dy);
-	};
-
-	this.normalize = function(length) {
-		/** @todo normalization **/
-		return this;
-	};
-	this.set(dx, dy);
-};
-
-function Tween(engine, target, props, time) {
-	this.target = target;
-	this.props = props;
-	this.time = time;
-	this.done = false;
-
-	this.currentTime = 0;
-
-	this.initialVals = new Object();
-	this.targetVals = new Object();
-
-	for (var key in props) {
-		this.initialVals[key] = target[key];
-		this.targetVals[key] = props[key];
-	}
-
-	engine.addTween(this);
-
-	this.step = function(deltaTime) {
-
-		if (this.currentTime >= this.time) {
-			this.done = true;
-		} else {
-			for (var k in this.target) {
-				this.target[k] = this.initialVals[k] + (this.targetVals[k] - this.initialVals[k]) * (this.currentTime / this.time);
-			};
-
-			this.currentTime += deltaTime;
-		}
-	};
-};
-
-function SpriteAnimation(firstFrame, lastFrame, fps) {
-	this.firstFrame = firstFrame;
-	this.lastFrame = lastFrame;
-	this.frameTime = (1000 / fps);
-};
-
-function Sprite() {
-	this.image = null;
-	this.engine = null;
-	this.x = 0;
-	this.y = 0;
-	this.width = 0;
-	this.height = 0;
-	this.cx = 0;
-	this.cy = 0;
-	this.visible = true;
-	this.animated = false;
-	this.frames = new Array();
-	this.frameWidth = 0;
-	this.frameHeight = 0;
-	this.frameTime = 24;
-	this.frameLastTime = 0;
-	this.currentFrame = 0;
-	this.playAnimation = true;
-	this.parent = null;
-	this.children = new Array(); // Children Sprites
-	this.flipHorizontal = false;
-	this.flipVertical = false;
-	this.animations = {};
-	this.currentAnimation = 'all';
-	this.frameCanvas = null;
-	this.flippedCopy = null; // Filpped copy of the image
-	this.alpha = 1;
-
-	this.resultAlpha = function() {
-		if (this.parent == null) {
-			return this.alpha;
-		} else {
-			return this.alpha * this.parent.resultAlpha();
-		}
-	};
-
-	this.onadded = function(addedTo) {};
-	this.onremoved = function(removedFrom) {};
-
-	this.globalX = function() {
-		if (this.parent == null) {
-			return this.x;
-		} else {
-			return this.parent.globalX() + this.x;
-		}
-	};
-
-	this.globalY = function() {
-		if (this.parent == null) {
-			return this.y;
-		} else {
-			return this.parent.globalY() + this.y;
-		}
-	};
-
-	this.addChild = function(sprite) {
-		this.children.push(sprite);
-		sprite.engine = this.engine;
-		sprite.parent = this;
-		sprite.onadded(this);
-	};
-
-	this.removeChild = function(sprite) {
-		var i = this.children.indexOf(sprite);
-		if (i !== -1) {
-			sprite.parent = null;
-			sprite.engine = null;
-			sprite.onremoved(this);
-			this.children.splice(i, 1);
-		}
-	}
-
-	/**
-	 * Set image for this Sprite
-	 */
-	this.setImage = function(newImage, createFlippedCopy) {
-		if (typeof createFlippedCopy == "undefined")
-			createFlippedCopy = true;
-
-		if (createFlippedCopy) {
-			this.flippedCopy = document.createElement('canvas');
-			this.flippedCopy.width = newImage.width;
-			this.flippedCopy.height = newImage.height;
-
-			var ctx = this.flippedCopy.getContext('2d');
-			ctx.translate(newImage.width, 0);
-			ctx.scale(-1, 1);
-			ctx.drawImage(newImage, 0, 0);
+		this.setRGBA = function(r, g, b, a) {
+			this.r = r;
+			this.g = g;
+			this.b = b;
+			this.a = a;
 		}
 
-		this.image = newImage;
-		this.width = newImage.width;
-		this.height = newImage.height;
-		this.cx = this.width / 2;
-		this.cy = this.height / 2;
-	};
+		this.getFullHex = function() {
+			return '#' + this.r.toString(16) + this.g.toString(16) + this.b.toString(16) + this.a.toString(16);
+		};
 
-	this.createAnimClip = function(name, firstFrame, lastFrame, fps) {
-		var newAnim = new SpriteAnimation(firstFrame, lastFrame, fps);
-		this.animations[name] = newAnim;
-	};
-
-	this.setAnim = function(name) {
-		if ((typeof this.animations[name] !== "undefined") && (this.currentAnimation != name)) {
-			this.currentAnimation = name;
-			this.currentFrame = this.animations[name].firstFrame;
-		}
+		this.getRGBHex = function() {
+			return '#' + this.r.toString(16) + this.g.toString(16) + this.b.toString(16);
+		};
 	};
 
 	/**
-	 * Init Sprite animation
+	 * Vector utility object
 	 */
-	this.initAnimation = function(frameWidth, frameHeight, fps) {
-		this.frameCanvas = document.createElement('canvas');
-		this.frameWidth = this.frameCanvas.width = frameWidth;
-		this.frameHeight = this.frameCanvas.height = frameHeight;
-		this.frameTime = Math.floor(1000 / fps);
-		this.animated = true;
-
-		for (var framey = 0; framey < this.height / frameHeight; framey++) {
-			for (var framex = 0; framex < this.width / frameWidth; framex++) {
-				this.frames.push({
-					'framex': framex,
-					'framey': framey
-				});
-			};
+	function Vector(dx, dy) {
+		this.set = function(dx, dy) {
+			this.dx = dx;
+			this.dy = dy;
 		};
 
-		this.animations = {
-			'all': this.createAnimClip(0, this.frames.length - 1, fps)
+		this.length = function() {
+			return Math.sqrt(dx * dx + dy * dy);
 		};
 
-		this.width = frameWidth;
-		this.height = frameHeight;
-		this.cx = this.width / 2;
-		this.cy = this.height / 2;
+		this.normalize = function(length) {
+			/** @todo normalization **/
+			return this;
+		};
+		this.set(dx, dy);
 	};
 
-	var lastTime = new Date().getTime();
-
-	this.pause = function() {
-		this.playAnimation = false;
-	};
-
-	this.stop = function() {
-		this.pause();
+	/**
+	 * The Sprite object
+	 */
+	function Sprite(engine) {
+		this.image = null;
+		this.x = 0;
+		this.y = 0;
+		this.width = 0;
+		this.height = 0;
+		this.cx = 0;
+		this.cy = 0;
+		this.visible = true;
+		this.animated = false;
+		this.frames = new Array();
+		this.frameWidth = 0;
+		this.frameHeight = 0;
+		this.frameTime = 24;
+		this.frameLastTime = 0;
 		this.currentFrame = 0;
-	};
-
-	this.play = function() {
 		this.playAnimation = true;
-	};
+		this.parent = null;
+		this.children = new Array(); // Children Sprites
+		this.flipHorizontal = false;
+		this.flipVertical = false;
+		this.animations = {};
+		this.currentAnimation = 'all';
+		this.frameCanvas = null;
+		this.flippedCopy = null; // Filpped copy of the image
+		this.alpha = 1;
 
-	this.onupdate = function(deltaTime) {};
+		this.onadded = null;
+		this.onremoved = null;
+		this.onupdate = null;
+		this.onanimationfinished = null;
 
-	this.onanimationfinished = function() {};
+		function SpriteAnimation(firstFrame, lastFrame, fps) {
+			this.firstFrame = firstFrame;
+			this.lastFrame = lastFrame;
+			this.frameTime = (1000 / fps);
+		};
 
-	this.renderFrame = function(context, frameNum, atX, atY) {
-		var imageToDraw = this.flipHorizontal ? this.flippedCopy : this.image;
-		var frameNumber = this.flipHorizontal ? (this.frames.length - 1) - frameNum : frameNum;
-		var addwidth = this.flipHorizontal ? 0 : 0;
+		/**
+		 * Add a child sprite
+		 */
+		this.addChild = function(sprite) {
+			this.children.push(sprite);
+			sprite.parent = this;
 
-		context.drawImage(imageToDraw, (this.frames[frameNumber].framex + addwidth) * this.frameWidth, this.frames[frameNumber].framey * this.frameHeight, this.frameWidth, this.frameHeight, atX, atY, this.width, this.height);
-	};
+			if (sprite.onadded != null)
+				sprite.onadded(this);
 
-	/**
-	 * Render the Sprite
-	 */
-	this.render = function(deltaTime) {
-		this.onupdate(deltaTime);
+			return this;
+		};
 
-		if (!this.visible) {
-			return;
-		}
+		/**
+		 * Set function on finished animation
+		 */
+		this.animationfinished = function(animationFinishedFunction) {
+			this.onanimationfinished = animationFinishedFunction;
+			return this;
+		};
 
-		if (this.engine != null) {
-			this.engine.context.globalAlpha = this.resultAlpha();
+		this.createAnimClip = function(name, firstFrame, lastFrame, fps) {
+			var newAnim = new SpriteAnimation(firstFrame, lastFrame, fps);
+			this.animations[name] = newAnim;
 
-			if (this.image != null) {
-				if (this.animated) {
-					this.renderFrame(this.engine.context, this.currentFrame, this.globalX() - this.cx, this.globalY() - this.cy);
+			return this;
+		};
 
-					if (this.playAnimation) {
-						this.frameLastTime += deltaTime;
-						if (this.frameLastTime > this.animations[this.currentAnimation].frameTime) {
-							this.currentFrame++;
-							this.frameLastTime = 0;
+		/**
+		 * Get global X
+		 */
+		this.globalX = function() {
+			if (this.parent == null) {
+				return this.x;
+			} else {
+				return this.parent.globalX() + this.x;
+			}
+		};
 
-							if (this.currentFrame > this.animations[this.currentAnimation].lastFrame) {
-								this.currentFrame = this.animations[this.currentAnimation].firstFrame;
-								this.onanimationfinished();
+		/**
+		 * Get gloval Y
+		 */
+		this.globalY = function() {
+			if (this.parent == null) {
+				return this.y;
+			} else {
+				return this.parent.globalY() + this.y;
+			}
+		};
+
+		/**
+		 * Init Sprite animation
+		 */
+		this.initAnimation = function(frameWidth, frameHeight, fps) {
+			this.frameCanvas = document.createElement('canvas');
+			this.frameWidth = this.frameCanvas.width = frameWidth;
+			this.frameHeight = this.frameCanvas.height = frameHeight;
+			this.frameTime = Math.floor(1000 / fps);
+			this.animated = true;
+
+			for (var framey = 0; framey < this.height / frameHeight; framey++) {
+				for (var framex = 0; framex < this.width / frameWidth; framex++) {
+					this.frames.push({
+						'framex': framex,
+						'framey': framey
+					});
+				};
+			};
+
+			this.animations = {
+				'all': this.createAnimClip(0, this.frames.length - 1, fps)
+			};
+
+			this.width = frameWidth;
+			this.height = frameHeight;
+			this.cx = this.width / 2;
+			this.cy = this.height / 2;
+
+			return this;
+		};
+
+		/**
+		 * Remove a child from the sprite
+		 */
+		this.removeChild = function(sprite) {
+			var i = this.children.indexOf(sprite);
+			if (i !== -1) {
+				sprite.parent = null;
+				if (sprite.onremoved !== null)
+					sprite.onremoved(this);
+				this.children.splice(i, 1);
+			}
+
+			return this;
+		};
+
+		/**
+		 * The alpha value of the current sprite multiplied by partnt sprite alpha value
+		 */
+		this.resultAlpha = function() {
+			if (this.parent == null) {
+				return this.alpha;
+			} else {
+				return this.alpha * this.parent.resultAlpha();
+			}
+		};
+
+		/**
+		 * Set image for this Sprite
+		 */
+		this.setImage = function(newImage, createFlippedCopy) {
+			if (typeof createFlippedCopy == "undefined")
+				createFlippedCopy = true;
+
+			if (createFlippedCopy) {
+				this.flippedCopy = document.createElement('canvas');
+				this.flippedCopy.width = newImage.width;
+				this.flippedCopy.height = newImage.height;
+
+				var ctx = this.flippedCopy.getContext('2d');
+				ctx.translate(newImage.width, 0);
+				ctx.scale(-1, 1);
+				ctx.drawImage(newImage, 0, 0);
+			}
+
+			this.image = newImage;
+			this.width = newImage.width;
+			this.height = newImage.height;
+			this.cx = this.width / 2;
+			this.cy = this.height / 2;
+
+			return this;
+		};
+
+		/**
+		 * Set current animation
+		 */
+		this.setAnim = function(name) {
+			if ((typeof this.animations[name] !== "undefined") && (this.currentAnimation != name)) {
+				this.currentAnimation = name;
+				this.currentFrame = this.animations[name].firstFrame;
+			}
+
+			return this;
+		};
+
+		/**
+		 * Pause current animation
+		 */
+		this.pause = function() {
+			this.playAnimation = false;
+			return this;
+		};
+
+		/**
+		 * Stop current animation
+		 */
+		this.stop = function() {
+			this.pause();
+			this.currentFrame = 0;
+			return this;
+		};
+
+		/**
+		 * Play current animation
+		 */
+		this.play = function() {
+			this.playAnimation = true;
+			return this;
+		};
+
+		/**
+		 * Set the position of the sprite
+		 */
+		this.setPosition = function(newx, newy) {
+			this.x = newx;
+			this.y = newy;
+			return this;
+		};
+
+		/**
+		 * Render a single frame at the context
+		 */
+		this.renderFrame = function(context, frameNum, atX, atY) {
+			var imageToDraw = this.flipHorizontal ? this.flippedCopy : this.image;
+			var frameNumber = this.flipHorizontal ? (this.frames.length - 1) - frameNum : frameNum;
+			var addwidth = this.flipHorizontal ? 0 : 0;
+
+			context.drawImage(imageToDraw, (this.frames[frameNumber].framex + addwidth) * this.frameWidth, this.frames[frameNumber].framey * this.frameHeight, this.frameWidth, this.frameHeight, atX, atY, this.width, this.height);
+		};
+
+		/**
+		 * Render the Sprite
+		 */
+		this.render = function(deltaTime) {
+			if (!this.visible) {
+				return;
+			}
+
+			if (this.onupdate !== null) {
+				this.onupdate(deltaTime);
+			}
+
+			if (engine != null) {
+				engine.context.globalAlpha = this.resultAlpha();
+
+				if (this.image != null) {
+					if (this.animated) {
+						this.renderFrame(engine.context, this.currentFrame, this.globalX() - this.cx, this.globalY() - this.cy);
+
+						if (this.playAnimation) {
+							this.frameLastTime += deltaTime;
+							if (this.frameLastTime > this.animations[this.currentAnimation].frameTime) {
+								this.currentFrame++;
+								this.frameLastTime = 0;
+
+								if (this.currentFrame > this.animations[this.currentAnimation].lastFrame) {
+									this.currentFrame = this.animations[this.currentAnimation].firstFrame;
+									if (this.onanimationfinished !== null) {
+										this.onanimationfinished();
+									}
+								}
 							}
 						}
+					} else {
+						var imageToDraw = this.flipHorizontal ? this.flippedCopy : this.image;
+						engine.context.drawImage(imageToDraw, 0, 0, imageToDraw.width, imageToDraw.height, this.globalX() - this.cx, this.globalY() - this.cy, this.width, this.height);
 					}
-				} else {
-					var imageToDraw = this.flipHorizontal ? this.flippedCopy : this.image;
-					this.engine.context.drawImage(imageToDraw, 0, 0, imageToDraw.width, imageToDraw.height, this.globalX() - this.cx, this.globalY() - this.cy, this.width, this.height);
 				}
-			}
+			};
 
 			for (var i = 0; i < this.children.length; i++) {
 				this.children[i].render(deltaTime);
 			};
-		}
-	};
-};
-
-function TextSprite(initialText) {
-	var tc = document.createElement('canvas');
-	var ctx = tc.getContext('2d');
-
-	ctx.font = '8pt MetroidNES';
-	ctx.fillStyle = '#4ea5e6';
-	ctx.fillText(initialText, 0, 0);
-
-	var metrics = ctx.measureText(initialText);
-	tc.width = metrics.width;
-	tc.height = metrics.height;
-
-	this.setImage(tc);
-};
-TextSprite.prototype = new Sprite();
-
-function Sound() {
-	function SoundChannel(audio) {
-		this.audioObject = new Audio();
-		this.audioObject.src = audio.src;
-		this.audioObject.load();
-
-		this.isPlaying = false;
-
-		this.canPlay = function() {
-			return this.isPlaying || this.audioObject.ended;
 		};
+
+		/**
+		 * Set update function
+		 */
+		this.update = function(updateFunction) {
+			this.onupdate = updateFunction;
+			return this;
+		};
+	};
+
+	function TextSprite(initialText) {
+		var tc = document.createElement('canvas');
+		var ctx = tc.getContext('2d');
+
+		ctx.font = '8pt MetroidNES';
+		ctx.fillStyle = '#4ea5e6';
+		ctx.fillText(initialText, 0, 0);
+
+		var metrics = ctx.measureText(initialText);
+		tc.width = metrics.width;
+		tc.height = metrics.height;
+
+		this.setImage(tc);
+	};
+	TextSprite.prototype = new Sprite();
+
+	function Sound() {
+		function SoundChannel(audio) {
+			this.audioObject = new Audio();
+			this.audioObject.src = audio.src;
+			this.audioObject.load();
+
+			this.isPlaying = false;
+
+			this.canPlay = function() {
+				return this.isPlaying || this.audioObject.ended;
+			};
+
+			this.play = function(loop) {
+				if (typeof loop != "undefined") {
+					this.audioObject.loop = loop;
+				}
+				this.audioObject.play();
+				this.isPlaying = true;
+			};
+		};
+
+		this.maxchannels = 5;
+
+		this.channels = new Array(this.maxchannels);
+		this.channelToUse = 0;
 
 		this.play = function(loop) {
-			if (typeof loop != "undefined") {
-				this.audioObject.loop = loop;
-			}
-			this.audioObject.play();
-			this.isPlaying = true;
+			this.channels[this.channelToUse].play(loop);
+			this.channelToUse++;
+			if (this.channelToUse == this.maxchannels)
+				this.channelToUse = 0;
+		}
+
+		this.initSound = function(audio) {
+			for (var i = 0; i < this.maxchannels; i++) {
+				this.channels[i] = new SoundChannel(audio);
+			};
 		};
 	};
 
-	this.maxchannels = 5;
-
-	this.channels = new Array(this.maxchannels);
-	this.channelToUse = 0;
-
-	this.play = function(loop) {
-		this.channels[this.channelToUse].play(loop);
-		this.channelToUse++;
-		if (this.channelToUse == this.maxchannels)
-			this.channelToUse = 0;
-	}
-
-	this.initSound = function(audio) {
-		for (var i = 0; i < this.maxchannels; i++) {
-			this.channels[i] = new SoundChannel(audio);
-		};
+	var keyboard = {
+		key_backspace: 8,
+		key_tab: 9,
+		key_enter: 13,
+		key_shift: 16,
+		key_alt: 18,
+		key_ctrl: 17,
+		key_capslock: 20,
+		key_left: 37,
+		key_right: 39,
+		key_up: 38,
+		key_down: 40,
+		key_space: 32,
+		key_w: 87,
+		key_a: 65,
+		key_c: 67,
+		key_s: 83,
+		key_d: 68,
+		key_z: 90,
+		key_x: 88
 	};
-};
 
-var Keyboard = {
-	key_backspace: 8,
-	key_tab: 9,
-	key_enter: 13,
-	key_shift: 16,
-	key_alt: 18,
-	key_ctrl: 17,
-	key_capslock: 20,
-	key_left: 37,
-	key_right: 39,
-	key_up: 38,
-	key_down: 40,
-	key_space: 32,
-	key_w: 87,
-	key_a: 65,
-	key_c: 67,
-	key_s: 83,
-	key_d: 68,
-	key_z: 90,
-	key_x: 88
-};
-
-function Engine(renderID) {
 	var engine = this;
 
-	this.canvas = document.getElementById(renderID);
+	this.fps = 0;
+
+	/**
+	 * Events
+	 */
+	this.onresize = null;
+	this.onready = null;
+
+	this.ready = function(readyFunction) {
+		this.onready = readyFunction;
+		return this;
+	};
+
+	this.resize = function(resizeFunction) {
+		this.onresize = resizeFunction;
+		return this;
+	};
+
+	if (typeof options['canvas'] !== "undefined") {
+		this.canvas = document.getElementById(options['canvas']);
+	} else {
+		this.canvas = document.createElement('canvas');
+		document.body.appendChild(this.canvas);
+	}
 	this.context = this.canvas.getContext('2d');
-	this.screenWidth = this.canvas.width;
-	this.screenHeight = this.canvas.height;
-	this.frameRate = 60;
-	this.clearStyle = '#6495ED';
+	if (typeof options['fullScreen'] !== "undefined") {
+		function resizeCanvas(e, newWidth, newHeight) {
+			e.screenWidth = e.canvas.width = newWidth;
+			e.screenHeight = e.canvas.height = newHeight;
+			if (e.onresize !== null) {
+				e.onresize(e.screenWidth, e.screenHeight);
+			}
+		}
+		var e = this;
+		window.onresize = function() {
+			resizeCanvas(e, document.body.clientWidth, document.body.clientHeight);
+		}
+		resizeCanvas(e, document.body.clientWidth, document.body.clientHeight);
+	} else {
+		this.screenWidth = this.canvas.width;
+		this.screenHeight = this.canvas.height;
+	}
+	this.frameRate = typeof options['frameRate'] == "undefined" ? 60 : options['frameRate'];
+	this.clearStyle = typeof options['clearColor'] == "undefined" ? '#6495ED' : options['clearColor'];
 	this.r = {}; // Resources
-	this.tweens = new Array();
-
 	this.anykey = false;
-
-	this.addTween = function(tween) {
-		this.tweens.push(tween);
-	};
-
-	this.setClearStyle = function(newClearStyle) {
-		this.clearStyle = newClearStyle;
-	};
 
 	/**
 	 * Keyboard input handle
@@ -429,7 +508,6 @@ function Engine(renderID) {
 		return this.isKeyDown(Keyboard.key_down) || this.isKeyDown(Keyboard.key_s);
 	};
 
-
 	/**
 	 * Mouse input
 	 */
@@ -458,6 +536,18 @@ function Engine(renderID) {
 	this.canvas.addEventListener("mousedown", this.onMouseDown);
 	this.canvas.addEventListener("mouseup", this.onMouseUp);
 
+	this.globalX = function() {
+		return this.screenWidth / 2;
+	};
+
+	this.globalY = function() {
+		return this.screenHeight / 2;
+	};
+
+	this.resultAlpha = function() {
+		return 1;
+	};
+
 	/**
 	 * Clear canvas
 	 *
@@ -470,75 +560,120 @@ function Engine(renderID) {
 
 	this.clear();
 
-	this.onrender = null;
-	this.root = null;
+	this.resourceDeclaration = null;
 
-	this.setRootSprite = function(sprite) {
-		this.root = sprite;
-		sprite.engine = this;
-		sprite.onadded(this);
+	if (typeof options["resources"] !== "undefined") {
+		this.resourceDeclaration = options["resources"];
+	}
+
+	this.children = [];
+
+	this.addChild = function(sprite) {
+		this.children.push(sprite);
+		sprite.parent = this;
+		if (sprite.onadded !== null)
+			sprite.onadded(this);
+		return this;
+	};
+
+	this.removeChild = function(sprite) {
+		var index = this.children.indexOf(sprite);
+		if (index !== -1) {
+			sprite.parent = null;
+			if (sprite.onremoved !== null)
+				sprite.onremoved(this);
+			this.children.splice(index, 1);
+		}
+		return this;
 	};
 
 	/**
-	 * Run the game
+	 * Start the Engine
+	 *
 	 */
-	this.run = function() {
-		var lastTime = 0;
-		var deltaTime = 0;
-		var frameCount = 0;
-
-		var render = function(engine) {
-			var currentTime = new Date().getTime();
-			deltaTime = currentTime - lastTime;
-			lastTime = currentTime;
-
-			engine.clear();
-
-			for (var i = 0; i < engine.tweens.length; i++) {
-				if (!engine.tweens[i].done) {
-					engine.tweens[i].step(deltaTime);
+	this.go = function() {
+		(function(e) {
+			e.loadResources(function() {
+				if (e.onready != null) {
+					e.onready();
 				}
-			};
 
-			// use render callback if we have one
-			if (engine.onrender !== null) {
-				engine.onrender();
-				// render root sprtie if we have one
-			} else if (engine.root != null) {
-				engine.root.render(deltaTime);
-			}
+				(function() {
+					var lastTime = 0;
+					var deltaTime = 0;
+					var frameCount = 0;
 
-			frameCount++;
+					var countFps = function(e) {
+						e.fps = frameCount;
+						frameCount = 0;
+					};
 
-			setTimeout(function() {
-				render(engine);
-			}, Math.floor(1000 / engine.frameRate));
-		};
+					setInterval(function() {
+						countFps(e);
+					}, 1000);
 
-		render(this);
+					var render = function(e) {
+						var currentTime = new Date().getTime();
+						deltaTime = currentTime - lastTime;
+						lastTime = currentTime;
+
+						e.clear();
+
+
+						for (var i = 0; i < e.children.length; i++) {
+							e.children[i].render(deltaTime);
+						};
+
+						frameCount++;
+
+						setTimeout(function() {
+							render(e);
+						}, Math.floor(1000 / e.frameRate));
+					};
+
+					render(e);
+				})();
+			});
+		})(this);
+		return this;
 	};
-
-	this.initSprite = function(sprite, resourceID) {
-		sprite.setImage(this.r[resourceID]);
-		sprite.engine = this;
-		return sprite;
-	}
 
 	/**
 	 * Generate Sprite from resource
 	 */
-	this.getSprite = function(resourceID) {
-		var newSprite = new Sprite();
-		return this.initSprite(newSprite, resourceID);
+	this.createSprite = function(resourceID, add) {
+		var sprite;
+
+		if (typeof resourceID == "undefined") {
+			sprite = new Sprite(this);
+		} else {
+			sprite = new Sprite(this).setImage(this.r[resourceID]);
+		}
+
+		if (typeof add !== "undefined") {
+			this.addChild(sprite);
+		}
+
+		return sprite;
 	};
 
-	this.playSound = function(soundID, loop) {
+	/**
+	 * Play sound by its ID
+	 */
+	this.playSound = function(soundID) {
 		if (typeof this.r[soundID] != "undefined") {
 			var sound = this.r[soundID];
-			sound.play(loop);
+			return sound;
 		} else {
 			console.log('sound not found:', soundID);
 		}
+	};
+
+	this.onloadingstep = function(progress) {
+		this.clear();
+		this.context.fillStyle = '#fff';
+		this.context.font = 'bold 40px Arial';
+		this.context.fillText('Loading: ' + progress + '%', 10, this.canvas.height / 2);
 	};
 
 	/**
@@ -579,52 +714,47 @@ function Engine(renderID) {
 		}
 	};
 
-	this.onloadingstep = function(progress) {
-		this.clear();
-		this.context.fillStyle = '#fff';
-		this.context.font = 'bold 40px Arial';
-		this.context.fillText('Loading: ' + progress + '%', 10, this.canvas.height / 2);
-	};
+	this.loadResources = function(callback) {
+		if (this.resourceDeclaration != null) {
+			var resources = this.resourceDeclaration['files'];
+			var baseDir = typeof this.resourceDeclaration['baseDir'] == "undefined" ? "./" : this.resourceDeclaration['baseDir'];
+			var resourcesLoaded = 0;
+			var resourcesToLoad = 0;
+			var resourceQueue = [];
 
-	this.loadResources = function(resourcesArray, baseDir, callback) {
-		if (typeof baseDir === "undefined") {
-			baseDir = '.';
-		};
-		var resourcesLoaded = 0;
-		var resourcesToLoad = 0;
-		var resourceQueue = [];
+			this.onloadingstep(0);
 
-		this.onloadingstep(0);
-
-		for (var folder in resourcesArray) {
-			for (var fileID in resourcesArray[folder]) {
-				resourceQueue.push({
-					'id': fileID,
-					'type': folder,
-					'fullPath': './' + baseDir + '/' + folder + '/' + resourcesArray[folder][fileID]
-				});
-				resourcesToLoad++;
-			}
-		};
-
-		function engineRun() {
-			callback();
-			engine.run();
-		};
-
-		if (resourcesToLoad > 0) {
-			for (var i = resourceQueue.length - 1; i >= 0; i--) {
-				this.loadResource(resourceQueue[i]['fullPath'], resourceQueue[i]['type'], resourceQueue[i]['id'], function(engine, id, fullPath) {
-					console.log(fullPath + ' loaded');
-					engine.onloadingstep(Math.floor(resourcesLoaded / resourcesToLoad * 100));
-					resourcesLoaded++;
-					if (resourcesToLoad == resourcesLoaded) {
-						engineRun();
-					}
-				});
+			for (var folder in resources) {
+				for (var fileID in resources[folder]) {
+					resourceQueue.push({
+						'id': fileID,
+						'type': folder,
+						'fullPath': './' + baseDir + '/' + folder + '/' + resources[folder][fileID]
+					});
+					resourcesToLoad++;
+				}
 			};
+
+			function engineReady() {
+				callback();
+			};
+
+			if (resourcesToLoad > 0) {
+				for (var i = resourceQueue.length - 1; i >= 0; i--) {
+					this.loadResource(resourceQueue[i]['fullPath'], resourceQueue[i]['type'], resourceQueue[i]['id'], function(engine, id, fullPath) {
+						console.log(fullPath + ' loaded');
+						engine.onloadingstep(Math.floor(resourcesLoaded / resourcesToLoad * 100));
+						resourcesLoaded++;
+						if (resourcesToLoad == resourcesLoaded) {
+							engineReady();
+						}
+					});
+				};
+			} else {
+				engineReady();
+			}
 		} else {
-			engineRun();
+			callback();
 		}
 	};
 };
