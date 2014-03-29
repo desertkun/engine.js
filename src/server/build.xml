@@ -1,0 +1,15 @@
+<project name="Simpliest Server" default="pack" basedir=".">
+	<target name="compile">
+		<mkdir dir="classes" />
+		<javac srcdir="." destdir="classes" />
+	</target>
+
+	<target name="pack" depends="compile">
+		<jar basedir="classes" destfile="../../dist/start.jar">
+			<manifest>
+				<attribute name="Main-Class" value="core.Main"/>
+			</manifest>
+		</jar>
+		<delete dir="classes" />
+	</target>
+</project>
