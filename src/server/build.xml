@@ -1,15 +1,21 @@
-<project name="Simpliest Server" default="pack" basedir=".">
+<project name="Minimal HTTP Server" default="pack" basedir=".">
 	<target name="compile">
 		<mkdir dir="classes" />
 		<javac srcdir="." destdir="classes" />
 	</target>
 
 	<target name="pack" depends="compile">
+		<delete file="../../dist/start.jar" />
 		<jar basedir="classes" destfile="../../dist/start.jar">
 			<manifest>
 				<attribute name="Main-Class" value="core.Main"/>
 			</manifest>
 		</jar>
+		<chmod file="../../dist/start.jar" perm="777" />
 		<delete dir="classes" />
+	</target>
+
+	<target name="run" depends="pack">
+		<java jar="../../dist/start.jar" />
 	</target>
 </project>
