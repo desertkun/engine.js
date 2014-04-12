@@ -37,6 +37,98 @@
         return this;
     }
 
+    function CollisionShape() {
+        this.x = 0;
+        this.y = 0;
+        this.parent = null;
+        this.dynamic = false;
+    }
+
+    CollisionShape.prototype.globalX = function() {
+        return this.parent.globalX() + this.x;
+    }
+
+    CollisionShape.prototype.globalY = function() {
+        return this.parent.globalY() + this.y;
+    }
+
+    CollisionShape.prototype.matrix_setup = function(ctx) {
+        ctx.globalAlpha = 0.5;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.translate(this.globalX(), this.globalY());
+    }
+
+    CollisionShape.prototype.debugRender = function(ctx) {
+
+    }
+
+    CollisionShape.prototype.test = function(contractor) {
+
+    }
+
+    function CollisionCircle(radius) {
+        this.radius = radius;
+    }
+    CollisionCircle.prototype = new CollisionShape();
+
+    CollisionCircle.prototype.test = function(contractor) {
+        if (contractor instanceof CollisionRect) {
+            var dx = contractor.globalX() - this.globalX();
+            var dy = contractor.globalY() - this.globalY();
+
+            var mindx = this.radius + contractor.halfWidth;
+            var mindy = this.radius + contractor.halfHeight;
+
+            if ((Math.abs(dx) < mindx) && (Math.abs(dy) < mindy)) {
+                var offsetx = mindx - Math.abs(dx);
+                var offsety = mindy - Math.abs(dy);
+
+                if (Math.abs(offsetx) > Math.abs(offsety)) {
+                    if (dy < 0) {
+                        this.parent.doCollision(0, -offsety, contractor);
+                    } else {
+                        this.parent.doCollision(0, offsety, contractor);
+                    }
+                } else {
+                    if (dx < 0) {
+                        this.parent.doCollision(-offsetx, 0, contractor);
+                    } else {
+                        this.parent.doCollision(offsetx, 0, contractor);
+                    }
+                }
+            }
+        }
+    }
+
+    CollisionCircle.prototype.debugRender = function(ctx) {
+        this.matrix_setup(ctx);
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, 2 * Math.PI);
+        ctx.fillStyle = '#f00';
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#ff0';
+        ctx.stroke();
+    }
+
+    function CollisionRect(halfWidth, halfHeight) {
+        this.halfWidth = halfWidth;
+        this.halfHeight = halfHeight;
+    }
+
+    CollisionRect.prototype = new CollisionShape();
+
+    CollisionRect.prototype.debugRender = function(ctx) {
+        this.matrix_setup(ctx);
+        ctx.beginPath();
+        ctx.rect(-this.halfWidth, -this.halfHeight, this.halfWidth * 2, this.halfHeight * 2);
+        ctx.fillStyle = '#f00';
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#ff0';
+        ctx.stroke();
+    }
+
     /**
      * The Sprite object
      */
@@ -44,13 +136,15 @@
         this.alpha = 1;
         this.animated = false;
         this.animations = {};
-        this.children = new Array(); // Children Sprites
+        this.children = new Array();
+        this.collisionsEnabled = false;
+        this.collisionShape = null;
         this.currentAnimation = 'all';
         this.currentFrame = 0;
         this.cx = 0;
         this.cy = 0;
         this.flipHorizontal = false;
-        this.flippedCopy = null; // Filpped copy of the image
+        this.flippedCopy = null;
         this.flipVertical = false;
         this.frameCanvas = null;
         this.frameHeight = 0;
@@ -60,6 +154,7 @@
         this.frameWidth = 0;
         this.height = 0;
         this.image = null;
+        this.mouseIsOver = false;
         this.parent = null;
         this.playAnimation = true;
         this.repeatX = 1;
@@ -72,19 +167,61 @@
 
         /** Events **/
         this.onadded = null;
+        this.onanimationfinished = null;
+        this.oncollision = null;
+        this.onmousedown = null;
+        this.onmouseenter = null;
+        this.onmouseleave = null;
+        this.onmouseup = null;
         this.onremoved = null;
         this.onupdate = null;
-        this.onanimationfinished = null;
     }
 
     function SpriteAnimation(firstFrame, lastFrame, fps) {
         this.firstFrame = firstFrame;
-        this.lastFrame = lastFrame;
         this.frameTime = (1000 / fps);
+        this.lastFrame = lastFrame;
+    }
+
+    Sprite.prototype.mouseEnter = function(callback) {
+        this.onmouseenter = callback;
+        return this;
+    }
+
+    Sprite.prototype.mouseLeave = function(callback) {
+        this.onmouseleave = callback;
+        return this;
+    }
+
+    Sprite.prototype.doCollision = function(offsetx, offsety, contractor) {
+        if (typeof this.oncollision === "function") {
+            this.oncollision.call(this, offsetx, offsety, contractor);
+        }
+    }
+
+    Sprite.prototype.collision = function(callback) {
+        this.oncollision = callback;
+        return this;
     }
 
     Sprite.prototype.init = function(callback) {
         callback.call(this);
+        return this;
+    }
+
+    Sprite.prototype.setCollisionShape = function(cs, dynamic) {
+        this.collisionShape = cs;
+        this.collisionShape.parent = this;
+        this.collisionShape.dynamic = dynamic;
+    }
+
+    Sprite.prototype.initCollisionCircle = function(radius, dynamic) {
+        this.setCollisionShape(new CollisionCircle(radius), dynamic);
+        return this;
+    }
+
+    Sprite.prototype.initCollisionRect = function(halfWidth, halfHeight, dynamic) {
+        this.setCollisionShape(new CollisionRect(halfWidth, halfHeight), dynamic);
         return this;
     }
 
@@ -95,7 +232,7 @@
         this.children.push(sprite);
         sprite.parent = this;
 
-        if (sprite.onadded != null)
+        if (typeof sprite.onadded === "function")
             sprite.onadded(this);
 
         return this;
@@ -112,7 +249,6 @@
     Sprite.prototype.createAnimClip = function(name, firstFrame, lastFrame, fps) {
         var newAnim = new SpriteAnimation(firstFrame, lastFrame, fps);
         this.animations[name] = newAnim;
-
         return this;
     }
 
@@ -142,11 +278,11 @@
      * Init Sprite animation
      */
     Sprite.prototype.initAnimation = function(frameWidth, frameHeight, fps) {
+        this.animated = true;
         this.frameCanvas = document.createElement('canvas');
-        this.frameWidth = this.frameCanvas.width = frameWidth;
         this.frameHeight = this.frameCanvas.height = frameHeight;
         this.frameTime = Math.floor(1000 / fps);
-        this.animated = true;
+        this.frameWidth = this.frameCanvas.width = frameWidth;
 
         for (var framey = 0; framey < this.height / frameHeight; framey++) {
             for (var framex = 0; framex < this.width / frameWidth; framex++) {
@@ -193,6 +329,11 @@
         } else {
             return this.alpha * this.parent.resultAlpha();
         }
+    }
+
+    Sprite.prototype.setAlpha = function(alpha) {
+        this.alpha = alpha;
+        return this;
     }
 
     /**
@@ -261,6 +402,11 @@
         return this;
     }
 
+    Sprite.prototype.setRotation = function(r) {
+        this.rotation = r;
+        return this;
+    }
+
     Sprite.prototype.move = function(dx, dy) {
         this.x += dx;
         this.y += dy;
@@ -320,10 +466,6 @@
             return;
         }
 
-        if (this.onupdate !== null) {
-            this.onupdate(deltaTime);
-        }
-
         if (engine != null) {
             this.matrix_setup();
 
@@ -355,11 +497,62 @@
                     };
                 }
             }
+
+            for (var i = 0; i < this.children.length; i++) {
+                this.children[i].render(deltaTime);
+            };
+
+            if ((this.collisionShape != null) && (engine.debug)) {
+                this.collisionShape.debugRender(engine.context);
+            }
         };
+    }
+
+    Sprite.prototype.doUpdate = function(deltaTime) {
+        if ((typeof this.onmouseenter === "function") || (typeof this.onmouseleave === "function")) {
+            if (((engine.mouse.globalX() > (this.globalX() - this.width / 2)) && (engine.mouse.globalX() < (this.globalX() + this.width / 2))) && ((engine.mouse.globalY() > (this.globalY() - this.height / 2)) && (engine.mouse.globalY() < (this.globalY() + this.height / 2)))) {
+                if (!this.mouseIsOver) {
+                    this.mouseIsOver = true;
+                    if (typeof this.onmouseenter === "function") {
+                        this.onmouseenter.call(this);
+                    }
+                }
+            } else {
+                if (this.mouseIsOver) {
+                    this.mouseIsOver = false;
+                    if (typeof this.onmouseleave === "function") {
+                        this.onmouseleave.call(this);
+                    }
+                }
+            }
+        }
+
+        if (this.collisionsEnabled) {
+            if (this.children.length >= 2) {
+                for (var i = 0; i < this.children.length; i++) {
+                    if (this.children[i].collisionShape != null) {
+                        if (this.children[i].collisionShape.dynamic) {
+                            var op1 = this.children[i];
+                            for (var j = 0; j < this.children.length; j++) {
+                                if (this.children[j] !== op1) {
+                                    var op2 = this.children[j];
+
+                                    op1.collisionShape.test(op2.collisionShape);
+                                }
+                            };
+                        }
+                    }
+                };
+            }
+        }
 
         for (var i = 0; i < this.children.length; i++) {
-            this.children[i].render(deltaTime);
+            this.children[i].doUpdate(deltaTime);
         };
+
+        if (typeof this.onupdate === "function") {
+            this.onupdate.call(this, deltaTime);
+        }
     }
 
     /**
@@ -396,6 +589,7 @@
         }
         this.audioObject.play();
         this.isPlaying = true;
+        return this;
     }
 
     function Sound() {
@@ -409,34 +603,36 @@
         this.channelToUse++;
         if (this.channelToUse == this.maxchannels)
             this.channelToUse = 0;
+        return this;
     }
 
     Sound.prototype.initSound = function(audio) {
         for (var i = 0; i < this.maxchannels; i++) {
             this.channels[i] = new SoundChannel(audio);
         };
+        return this;
     }
 
     function Keyboard(canvas) {
-        this.key_backspace = 8;
-        this.key_tab = 9;
-        this.key_enter = 13;
-        this.key_shift = 16;
+        this.key_a = 65;
         this.key_alt = 18;
-        this.key_ctrl = 17;
+        this.key_backspace = 8;
+        this.key_c = 67;
         this.key_capslock = 20;
+        this.key_ctrl = 17;
+        this.key_d = 68;
+        this.key_down = 40;
+        this.key_enter = 13;
         this.key_left = 37;
         this.key_right = 39;
-        this.key_up = 38;
-        this.key_down = 40;
-        this.key_space = 32;
-        this.key_w = 87;
-        this.key_a = 65;
-        this.key_c = 67;
         this.key_s = 83;
-        this.key_d = 68;
-        this.key_z = 90;
+        this.key_shift = 16;
+        this.key_space = 32;
+        this.key_tab = 9;
+        this.key_up = 38;
+        this.key_w = 87;
         this.key_x = 8;
+        this.key_z = 90;
 
         this.anykey = false;
 
@@ -524,6 +720,14 @@
                 mouse.left = false;
             });
         })(canvas, this);
+    }
+
+    Mouse.prototype.globalX = function() {
+        return this.x + (engine.screenWidth / 2);
+    }
+
+    Mouse.prototype.globalY = function() {
+        return this.y + (engine.screenHeight / 2);
     }
 
     Mouse.prototype.down = function(callback) {
@@ -679,13 +883,29 @@
         return this;
     }
 
-    function PH_Rect() {
+    function PH_Base() {
         this.fillStyle = 'yellow';
         this.strokeStyle = 'grey';
         this.lineWidth = 1;
     }
 
-    PH_Rect.prototype = new Sprite();
+    PH_Base.prototype = new Sprite();
+
+    PH_Base.prototype.fill = function(style) {
+        this.fillStyle = style;
+        return this;
+    }
+
+    PH_Base.prototype.stroke = function(style) {
+        this.strokeStyle = style;
+        return this;
+    }
+
+    function PH_Rect() {
+
+    }
+
+    PH_Rect.prototype = new PH_Base();
 
     PH_Rect.prototype.setSize = function(sx, sy) {
         this.width = sx;
@@ -695,7 +915,7 @@
         return this;
     }
 
-    PH_Rect.prototype.render = function(deltaTime) {
+    PH_Rect.prototype.render = function() {
         this.matrix_setup();
         (function(ctx, rect) {
             ctx.beginPath();
@@ -708,6 +928,33 @@
         })(engine.context, this);
     }
 
+    function PH_Circle() {
+        this.radius = 0;
+    }
+
+    PH_Circle.prototype = new PH_Base();
+
+    PH_Circle.prototype.setRadius = function(newRadius) {
+        this.radius = newRadius;
+        return this;
+    }
+
+    PH_Circle.prototype.render = function(deltaTime) {
+        this.matrix_setup();
+
+        (function(ctx, circle) {
+            ctx.beginPath();
+            ctx.arc(0, 0, circle.radius, 0, 2 * Math.PI);
+            ctx.fillStyle = circle.fillStyle;
+            ctx.fill();
+            ctx.lineWidth = circle.lineWidth;
+            ctx.strokeStyle = circle.strokeStyle;
+            ctx.stroke();
+        })(engine.context, this);
+
+        return this;
+    }
+
     function Placeholders() {
 
     }
@@ -718,6 +965,64 @@
         return r;
     }
 
+    Placeholders.prototype.circle = function(initRadius) {
+        var circle = new PH_Circle();
+        circle.setRadius(initRadius);
+        return circle;
+    }
+
+    function CollisionShapes() {}
+
+    CollisionShapes.prototype.rect = function(halfWidth, halfHeight) {
+        return new CollisionRect(halfWidth, halfHeight);
+    }
+
+    CollisionShapes.prototype.circle = function(radius) {
+        return new CollisionCircle(radius);
+    }
+
+    function Tween(target, duration, params) {
+        this.done = false;
+        this.target = target;
+        this.duration = duration;
+        this.func = function(v0, v1, t) {
+            return v0 + (v1 - v0) * t;
+        };
+
+        this.targetParams = params;
+
+        this._originalParams = {};
+
+        for (var p in params) {
+            this._originalParams[p] = target[p];
+        }
+
+        this._timePassed = 0;
+
+        // Events
+        this.onfinished = null;
+    }
+
+    Tween.prototype.update = function(deltaTime) {
+        var t = (this._timePassed / this.duration);
+        if (t > 1) {
+            this.done = true;
+            if (typeof this.onfinished === "function") {
+                this.onfinished.call(this.target);
+            }
+        } else {
+            for (p in this._originalParams) {
+                this.target[p] = this.func(this._originalParams[p], this.targetParams[p], t);
+            }
+            this._timePassed += deltaTime;
+        }
+    }
+
+    Tween.prototype.finished = function(callback) {
+        this.onfinished = callback;
+        return this;
+    }
+
     /**
      * Core Engine unit
      */
@@ -725,12 +1030,15 @@
         this.canvas = null;
         this.children = [];
         this.context = null;
+        this.debug = false;
         this.mouse = null;
         this.onready = null;
+        this.onrender = null;
         this.placeholders = new Placeholders();
         this.resources = new ResourceManager();
         this.screenHeight = 0;
         this.screenWidth = 0;
+        this.tweens = [];
 
         (function(engine) {
             engine.resources.onloadingstep = function(percent) {
@@ -741,6 +1049,12 @@
                 engine.context.fillText('Loading: ' + percent + '%', engine.canvas.width / 2, engine.canvas.height / 2);
             }
         })(this);
+    }
+
+    Engine.prototype.tween = function(target, duration, params) {
+        var newTween = new Tween(target, duration, params);
+        this.tweens.push(newTween);
+        return newTween;
     }
 
     Engine.prototype.vec2d = function(dx, dy) {
@@ -762,6 +1076,12 @@
 
     Engine.prototype.update = function(callback) {
         this.onupdate = callback;
+        return this;
+    }
+
+    Engine.prototype.render = function(callback) {
+        this.onrender = callback;
+        return this;
     }
 
     /**
@@ -794,8 +1114,23 @@
 
                 engine.clear();
 
+                if (typeof engine.onrender === "function") {
+                    engine.onrender.call(engine, engine.context);
+                }
+
+                for (var i_tween = engine.tweens.length - 1; i_tween >= 0; i_tween--) {
+                    engine.tweens[i_tween].update(deltaTime);
+                    if (engine.tweens[i_tween].done) {
+                        engine.tweens.splice(i_tween, 1);
+                    }
+                };
+
                 for (var i = 0; i < engine.children.length; i++) {
-                    engine.children[i].render(deltaTime);
+                    engine.children[i].doUpdate(deltaTime);
+                };
+
+                for (var i = 0; i < engine.children.length; i++) {
+                    engine.children[i].render();
                 };
 
                 frameCount++;
@@ -926,13 +1261,9 @@
         return newSprite;
     }
 
-    /**
-     * Play sound by its ID
-     */
     Engine.prototype.sound = function(soundID) {
         if (typeof this.resources.res[soundID] != "undefined") {
-            var soundObj = this.resources.res[soundID];
-            return soundObj;
+            return this.resources.res[soundID];
         } else {
             console.log('sound not found:', soundID);
         }
